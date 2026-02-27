@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+duckdb
+pandas
+python-multipart
+httpx
+asyncpg
+psycopg2-binary

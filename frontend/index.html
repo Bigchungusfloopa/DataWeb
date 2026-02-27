@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DataChat — Conversational Data Intelligence Platform</title>
+  <meta name="description" content="Upload any CSV and ask questions in natural language. Powered by Llama 3.1 and DuckDB." />
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="styles/clay.css" />
+  <link rel="stylesheet" href="styles/animations.css" />
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <div class="app-layout">
+    <!-- ── Sidebar ────────────────────────────────────────────────────────── -->
+    <aside class="sidebar" id="sidebar">
+      <!-- Rendered by sidebar.js -->
+    </aside>
+
+    <!-- ── Main Content ───────────────────────────────────────────────────── -->
+    <main class="main-content">
+
+      <!-- Dashboard View -->
+      <div class="view" id="view-dashboard">
+        <div class="view-header">
+          <h1 class="view-title">📊 Dashboard</h1>
+          <p class="view-subtitle">Dataset overview and key metrics</p>
+        </div>
+        <div id="stats-container"></div>
+        <div id="chart-container" class="mt-4"></div>
+      </div>
+
+      <!-- Chat View -->
+      <div class="view" id="view-chat">
+        <div class="view-header">
+          <h1 class="view-title">💬 Ask AI</h1>
+          <p class="view-subtitle">Ask anything about your data in plain English</p>
+        </div>
+        <div id="chat-view-content" style="flex:1; overflow:hidden; display:flex; flex-direction:column;"></div>
+      </div>
+
+      <!-- Explorer View -->
+      <div class="view" id="view-explorer">
+        <div class="view-header">
+          <h1 class="view-title">🔍 Data Explorer</h1>
+          <p class="view-subtitle">Browse, search, and filter your data</p>
+        </div>
+        <div id="explorer-table" style="flex:1;"></div>
+      </div>
+
+      <!-- Upload View -->
+      <div class="view" id="view-upload">
+        <div class="view-header">
+          <h1 class="view-title">📂 Upload CSV</h1>
+          <p class="view-subtitle">Load any structured CSV dataset to get started</p>
+        </div>
+
+        <div id="upload-view-content"></div>
+
+        <!-- How it works -->
+        <div class="mt-6">
+          <div class="view-subtitle" style="margin-bottom: 12px;">How it works</div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px;" class="stagger-in">
+            <div class="clay-card sky" style="padding: 18px;">
+              <div style="font-size:1.6rem; margin-bottom:8px;">1️⃣</div>
+              <div style="font-weight:800; color:var(--text-dark); margin-bottom:4px;">Upload CSV</div>
+              <div style="font-size:0.8rem; color:var(--text-mid); font-weight:600;">Drag your CSV — it's loaded into DuckDB instantly.</div>
+            </div>
+            <div class="clay-card mint" style="padding: 18px;">
+              <div style="font-size:1.6rem; margin-bottom:8px;">2️⃣</div>
+              <div style="font-weight:800; color:var(--text-dark); margin-bottom:4px;">Ask in English</div>
+              <div style="font-size:0.8rem; color:var(--text-mid); font-weight:600;">Type any question — Llama 3.1 generates the SQL.</div>
+            </div>
+            <div class="clay-card peach" style="padding: 18px;">
+              <div style="font-size:1.6rem; margin-bottom:8px;">3️⃣</div>
+              <div style="font-weight:800; color:var(--text-dark); margin-bottom:4px;">See Results</div>
+              <div style="font-size:0.8rem; color:var(--text-mid); font-weight:600;">DuckDB runs the query, AI explains in plain English + chart.</div>
+            </div>
+            <div class="clay-card yellow" style="padding: 18px;">
+              <div style="font-size:1.6rem; margin-bottom:8px;">4️⃣</div>
+              <div style="font-weight:800; color:var(--text-dark); margin-bottom:4px;">Verify SQL</div>
+              <div style="font-size:0.8rem; color:var(--text-mid); font-weight:600;">Every answer shows the SQL — fully explainable, no hallucinations.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Toast container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- App entry point (ES modules) -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
