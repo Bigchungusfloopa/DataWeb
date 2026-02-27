@@ -283,9 +283,14 @@ export class ChatPanel {
       sql: { label: '🗄️ SQL query', color: '#c4a1ff' },
     }[route] || { label: '🗄️ SQL query', color: '#c4a1ff' };
 
-    const hasChart = result.chart_type && !['none', 'table', 'kpi'].includes(result.chart_type) && result.rows?.length > 0;
-    const isKPI = result.chart_type === 'kpi' && result.rows?.length >= 1;
-    const hasTable = result.chart_type === 'table' && result.rows?.length > 0;
+    // A chart needs at least two columns and more than 0 rows.
+    // We also need to ensure it's not simply returning a "Column not found" error row.
+    const isErrorRow = result.rows?.length === 1 && result.columns?.[0] === 'error';
+    const hasDataRows = result.rows?.length > 0 && !isErrorRow;
+
+    const hasChart = hasDataRows && result.chart_type && !['none', 'table', 'kpi'].includes(result.chart_type) && result.columns?.length >= 2;
+    const isKPI = hasDataRows && result.chart_type === 'kpi';
+    const hasTable = hasDataRows && result.chart_type === 'table';
 
     // KPI card(s)
     let kpiHtml = '';
@@ -349,7 +354,7 @@ export class ChatPanel {
     messages.scrollTop = messages.scrollHeight;
 
     row.querySelector('.sql-toggle')?.addEventListener('click', function () {
-      const code = document.getElementById(this.target);
+      const code = document.getElementById(this.dataset.target);
       const isVisible = code?.classList.contains('visible');
       if (code) {
         code.classList.toggle('visible');
