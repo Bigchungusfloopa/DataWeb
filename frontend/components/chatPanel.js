@@ -423,20 +423,52 @@ export class ChatPanel {
     const row = document.createElement('div');
     row.className = 'msg-row ai';
     row.id = 'typing-row';
+
+    const scaffoldMsgs = [
+      'Reading dataset...',
+      'Analyzing schema...',
+      'Generating SQL context...',
+      'Executing query...',
+      'Formatting results...',
+      'Finalizing...'
+    ];
+
     row.innerHTML = `
       <div class="msg-avatar">🤖</div>
-      <div class="msg-bubble clay-card mint" style="padding:14px 18px;">
-        <div class="typing-indicator">
+      <div class="msg-bubble clay-card mint" style="padding:14px 18px; display:flex; align-items:center; gap:12px;">
+        <div class="typing-indicator" style="padding:0;">
           <div class="typing-dot"></div>
           <div class="typing-dot"></div>
           <div class="typing-dot"></div>
         </div>
+        <div id="scaffold-text" style="font-size: 0.85rem; font-weight: 700; color: var(--text-mid); transition: opacity 0.3s ease;">${scaffoldMsgs[0]}</div>
       </div>`;
     messages.appendChild(row);
     messages.scrollTop = messages.scrollHeight;
+
+    let step = 0;
+    this.typingInterval = setInterval(() => {
+      step++;
+      const el = document.getElementById('scaffold-text');
+      if (el && step < scaffoldMsgs.length) {
+        el.style.opacity = '0';
+        setTimeout(() => {
+          if (el) {
+            el.innerText = scaffoldMsgs[step];
+            el.style.opacity = '1';
+          }
+        }, 300);
+      } else if (step >= scaffoldMsgs.length) {
+        clearInterval(this.typingInterval);
+      }
+    }, 2500);
   }
 
   _removeTyping() {
+    if (this.typingInterval) {
+      clearInterval(this.typingInterval);
+      this.typingInterval = null;
+    }
     document.getElementById('typing-row')?.remove();
   }
 
