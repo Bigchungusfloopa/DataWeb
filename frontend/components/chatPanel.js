@@ -1,14 +1,5 @@
 import api from '../services/api.js';
 
-const SUGGESTIONS = [
-  'How many rows are in this dataset?',
-  'What is the churn rate?',
-  'Show churn by contract type',
-  'What is the average monthly charge?',
-  'Convert total revenue to INR',
-  'What does customer churn mean?',
-];
-
 export class ChatPanel {
   constructor(containerId) {
     this.container = document.getElementById(containerId);
@@ -28,24 +19,27 @@ export class ChatPanel {
     this.container.innerHTML = `
       <div class="chat-layout" style="display:flex; flex-direction:column; height:100%;">
         <div class="chat-header" style="padding:10px 16px; border-bottom:1px solid rgba(0,0,0,0.05); display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-          <select id="chat-session-select" style="flex:1; max-width:250px; padding:6px 10px; border-radius:8px; border:1px solid #ddd; background:#f9f9f9; font-weight:600; font-size:0.85rem;">
-            <option value="">-- Start a new chat --</option>
-          </select>
+          <div style="display:flex; align-items:center; gap:8px; flex:1; max-width:280px;">
+            <select id="chat-session-select" style="flex:1; padding:6px 10px; border-radius:8px; border:1px solid #ddd; background:#f9f9f9; font-weight:600; font-size:0.85rem;">
+              <option value="">-- Start a new chat --</option>
+            </select>
+            <button id="delete-chat-btn" title="Delete Chat" style="display:none; background:transparent; border:none; color:var(--clay-rose); cursor:pointer; font-size:1.1rem; padding:4px;">
+              <i class="ph-fill ph-trash"></i>
+            </button>
+          </div>
           <button id="new-chat-btn" class="clay-btn mint" style="padding:6px 14px; font-size:0.8rem; border-radius:8px; margin-left:10px;">+ New Chat</button>
         </div>
         
         <div class="chat-messages" id="chat-messages" style="flex:1; overflow-y:auto; position:relative;">
           <div class="empty-state" id="chat-empty">
-            <div class="empty-icon">💬</div>
+            <div class="empty-icon"><i class="ph ph-chat-teardrop-dots" style="font-size:3rem; margin-bottom:10px;"></i></div>
             <div class="empty-title">Ask anything about your data</div>
             <div class="empty-sub">Ask for SQL queries, currency conversions, definitions — or anything else.</div>
           </div>
         </div>
 
         <div class="suggestions" id="suggestions">
-          ${SUGGESTIONS.map(s => `
-            <button class="suggestion-chip" data-q="${s}">${s}</button>
-          `).join('')}
+          <!-- Populated dynamically based on schema -->
         </div>
 
         <div class="chat-input-bar">
@@ -74,6 +68,20 @@ export class ChatPanel {
       this.currentSessionId = null;
       this._updateSessionDropdown();
       this._renderMessages();
+    });
+
+    const deleteChatBtn = this.container.querySelector('#delete-chat-btn');
+    deleteChatBtn.addEventListener('click', async () => {
+      if (!this.currentSessionId) return;
+      try {
+        await api.deleteSession(this.currentSessionId);
+        delete this.sessions[this.currentSessionId];
+        this.currentSessionId = null;
+        this._updateSessionDropdown();
+        this._renderMessages();
+      } catch (err) {
+        console.error("Failed to delete chat:", err);
+      }
     });
 
     sessionSelect.addEventListener('change', (e) => {
@@ -178,18 +186,86 @@ export class ChatPanel {
     }
   }
 
-  setFileId(file_id) {
+  async setFileId(file_id) {
     this.file_id = file_id;
+
+    // Fetch sessions from backend
+    try {
+      const persistedSessions = await api.getSessions(file_id);
+      this.sessions = {};
+      for (const s of persistedSessions) {
+        this.sessions[s.id] = s;
+      }
+    } catch (err) {
+      console.error("Failed to fetch sessions", err);
+      this.sessions = {};
+    }
+
     // Auto-switch to the most recent session for this file, or new chat
     const fileSessions = Object.values(this.sessions).filter(s => s.file_id === file_id);
     this.currentSessionId = fileSessions.length > 0 ? fileSessions[fileSessions.length - 1].id : null;
 
     this._updateSessionDropdown();
     this._renderMessages();
+    this._generateSuggestions();
+  }
+
+  async _generateSuggestions() {
+    const suggestionsContainer = this.container.querySelector('#suggestions');
+    if (!suggestionsContainer) return;
+
+    if (!this.file_id || !window.app?.state?.schema) {
+      suggestionsContainer.innerHTML = '';
+      return;
+    }
+
+    const schema = window.app.state.schema;
+    const columns = schema.columns || [];
+
+    // We categorize columns roughly based on type
+    const numericCols = columns.filter(c => c.type.includes('INT') || c.type.includes('DOUBLE') || c.type.includes('FLOAT') || c.type.includes('DECIMAL')).map(c => c.name);
+    const textCols = columns.filter(c => c.type.includes('VARCHAR') || c.type.includes('STRING')).map(c => c.name);
+
+    let generated = [
+      `How many rows are in this dataset?`
+    ];
+
+    if (numericCols.length > 0) {
+      generated.push(`What is the average ${numericCols[0].replace(/_/g, ' ')}?`);
+    }
+
+    if (numericCols.length > 0 && textCols.length > 0) {
+      generated.push(`Show total ${numericCols[0].replace(/_/g, ' ')} grouped by ${textCols[0].replace(/_/g, ' ')}`);
+    }
+
+    if (textCols.length > 1) {
+      generated.push(`What are the top 5 most common ${textCols[0].replace(/_/g, ' ')}?`);
+    } else if (textCols.length > 0) {
+      generated.push(`Count records by ${textCols[0].replace(/_/g, ' ')}`);
+    }
+
+    generated.push('Can you summarize what this dataset is about?');
+
+    // De-duplicate and slice
+    generated = [...new Set(generated)].slice(0, 5);
+
+    suggestionsContainer.innerHTML = generated.map(s => `
+      <button class="suggestion-chip" data-q="${s}">${s}</button>
+    `).join('');
+
+    // Re-bind events to new chips
+    suggestionsContainer.querySelectorAll('.suggestion-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const input = this.container.querySelector('#chat-input');
+        input.value = chip.dataset.q;
+        this._sendMessage();
+      });
+    });
   }
 
   _updateSessionDropdown() {
     const select = this.container.querySelector('#chat-session-select');
+    const deleteBtn = this.container.querySelector('#delete-chat-btn');
     if (!select) return;
 
     const fileSessions = Object.values(this.sessions).filter(s => s.file_id === this.file_id);
@@ -197,6 +273,7 @@ export class ChatPanel {
     if (fileSessions.length === 0) {
       select.innerHTML = '<option value="">-- Start a new chat --</option>';
       select.disabled = true;
+      if (deleteBtn) deleteBtn.style.display = 'none';
       return;
     }
 
@@ -209,6 +286,10 @@ export class ChatPanel {
       html += `<option value="${s.id}" ${s.id === this.currentSessionId ? 'selected' : ''}>${this._escapeHtml(s.title)}</option>`;
     });
     select.innerHTML = html;
+
+    if (deleteBtn) {
+      deleteBtn.style.display = this.currentSessionId ? 'block' : 'none';
+    }
   }
 
   _renderMessages() {
@@ -220,7 +301,7 @@ export class ChatPanel {
     if (!this.currentSessionId || !this.sessions[this.currentSessionId] || this.sessions[this.currentSessionId].messages.length === 0) {
       messages.innerHTML = `
           <div class="empty-state" id="chat-empty">
-            <div class="empty-icon">💬</div>
+            <div class="empty-icon"><i class="ph ph-chat-teardrop-dots" style="font-size:3rem; margin-bottom:10px;"></i></div>
             <div class="empty-title">Ask anything about your data</div>
             <div class="empty-sub">Ask for SQL queries, currency conversions, definitions — or anything else.</div>
           </div>
@@ -248,7 +329,7 @@ export class ChatPanel {
     const row = document.createElement('div');
     row.className = `msg-row user`;
     row.innerHTML = `
-      <div class="msg-avatar">👤</div>
+      <div class="msg-avatar"><i class="ph-fill ph-user"></i></div>
       <div class="msg-bubble">${this._escapeHtml(text)}</div>
     `;
     messages.appendChild(row);
@@ -260,7 +341,7 @@ export class ChatPanel {
     const row = document.createElement('div');
     row.className = `msg-row ai`;
     row.innerHTML = `
-       <div class="msg-avatar">🤖</div>
+       <div class="msg-avatar"><i class="ph-fill ph-robot"></i></div>
        <div class="msg-bubble" style="background:#ffebee; color:#d32f2f;">${this._escapeHtml(text)}</div>
      `;
     messages.appendChild(row);
@@ -278,10 +359,10 @@ export class ChatPanel {
 
     // Route badge
     const badgeInfo = {
-      general: { label: '🧠 General answer', color: '#a1d4ff' },
-      compute: { label: '🔢 Compute + SQL', color: '#ffc4a1' },
-      sql: { label: '🗄️ SQL query', color: '#c4a1ff' },
-    }[route] || { label: '🗄️ SQL query', color: '#c4a1ff' };
+      general: { label: '<i class="ph-fill ph-brain" style="vertical-align:-2px; margin-right:4px;"></i> General answer', color: '#ffb3ba' },
+      compute: { label: '<i class="ph-fill ph-calculator" style="vertical-align:-2px; margin-right:4px;"></i> Compute + SQL', color: '#ffdfba' },
+      sql: { label: '<i class="ph-fill ph-database" style="vertical-align:-2px; margin-right:4px;"></i> SQL query', color: '#ffb3ba' },
+    }[route] || { label: '<i class="ph-fill ph-database" style="vertical-align:-2px; margin-right:4px;"></i> SQL query', color: '#ffb3ba' };
 
     // A chart needs at least two columns and more than 0 rows.
     // We also need to ensure it's not simply returning a "Column not found" error row.
@@ -333,13 +414,13 @@ export class ChatPanel {
     const sqlHtml = result.sql ? `
             <div class="sql-viewer">
               <button class="sql-toggle" data-target="sql-${msgId}">
-                🗂️ &nbsp;View Generated SQL &nbsp;▾
+                <i class="ph ph-code"></i> &nbsp;View Generated SQL &nbsp;▾
               </button>
               <pre class="sql-code" id="sql-${msgId}">${this._escapeHtml(result.sql)}</pre>
             </div>` : '';
 
     row.innerHTML = `
-          <div class="msg-avatar">🤖</div>
+          <div class="msg-avatar"><i class="ph-fill ph-robot"></i></div>
           <div class="msg-bubble" id="${msgId}">
             <div style="font-size:0.68rem;font-weight:800;color:#555;margin-bottom:8px;padding:2px 10px;background:${badgeInfo.color}44;border-radius:999px;display:inline-block;">${badgeInfo.label}</div>
             <div>${this._escapeHtml(result.explanation || 'Here are the results.')}</div>
@@ -358,9 +439,9 @@ export class ChatPanel {
       const isVisible = code?.classList.contains('visible');
       if (code) {
         code.classList.toggle('visible');
-        this.textContent = code.classList.contains('visible')
-          ? '🗂️   Hide SQL   ▴'
-          : '🗂️   View Generated SQL   ▾';
+        this.innerHTML = code.classList.contains('visible')
+          ? '<i class="ph ph-code"></i>   Hide SQL   ▴'
+          : '<i class="ph ph-code"></i>   View Generated SQL   ▾';
       }
     });
 
@@ -377,7 +458,7 @@ export class ChatPanel {
     const labels = rows.map(r => String(r[columns[0]]));
     const values = rows.map(r => parseFloat(r[columns[1]]) || 0);
 
-    const palette = ['#c4a1ff', '#a1d4ff', '#ffc4a1', '#a1ffcf', '#ffa1c4', '#fff4a1', '#a1b4ff', '#ffd4a1'];
+    const palette = ['#ffb3ba', '#ff8b94', '#ff6f69', '#ff9a9e', '#fecfef', '#ff9a9e', '#ff8b94', '#ffb3ba'];
 
     const config = {
       type: chart_type === 'line' ? 'line' : 'bar',
@@ -434,7 +515,7 @@ export class ChatPanel {
     ];
 
     row.innerHTML = `
-      <div class="msg-avatar">🤖</div>
+      <div class="msg-avatar"><i class="ph-fill ph-robot"></i></div>
       <div class="msg-bubble clay-card mint" style="padding:14px 18px; display:flex; align-items:center; gap:12px;">
         <div class="typing-indicator" style="padding:0;">
           <div class="typing-dot"></div>

@@ -3,10 +3,10 @@
  */
 export function renderSidebar(activeView, onNavigate, statusInfo, files = [], activeFileId = null, selectFile = null) {
   const nav = [
-    { id: 'dashboard', icon: '📊', label: 'Dashboard' },
-    { id: 'chat', icon: '💬', label: 'Ask AI' },
-    { id: 'explorer', icon: '🔍', label: 'Data Explorer' },
-    { id: 'upload', icon: '📂', label: 'Upload CSV' },
+    { id: 'dashboard', icon: '<i class="ph ph-squares-four"></i>', label: 'Dashboard' },
+    { id: 'chat', icon: '<i class="ph ph-magic-wand"></i>', label: 'Ask AI' },
+    { id: 'explorer', icon: '<i class="ph ph-magnifying-glass"></i>', label: 'Data Explorer' },
+    { id: 'upload', icon: '<i class="ph ph-upload-simple"></i>', label: 'Upload CSV' },
   ];
 
   const sidebar = document.getElementById('sidebar');
@@ -25,18 +25,21 @@ export function renderSidebar(activeView, onNavigate, statusInfo, files = [], ac
   if (files && files.length > 0) {
     filesHtml = files.map(f => `
           <div class="sidebar-file-item ${f.file_id === activeFileId ? 'active' : ''}" data-file-id="${f.file_id}">
-            <div class="file-icon">📄</div>
-            <div class="file-info" style="overflow:hidden; white-space:nowrap;">
+            <div class="file-icon"><i class="ph ph-file-csv"></i></div>
+            <div class="file-info" style="overflow:hidden; white-space:nowrap; flex:1;">
               <div class="file-name" style="font-size:0.8rem; font-weight:${f.file_id === activeFileId ? '800' : '600'}; color:${f.file_id === activeFileId ? 'var(--text-dark)' : 'var(--text-mid)'}; text-overflow:ellipsis; overflow:hidden;">${f.filename}</div>
               <div class="file-rows" style="font-size:0.65rem; color:var(--text-light);">${(f.row_count || 0).toLocaleString()} rows</div>
             </div>
+            <button class="delete-file-btn" onclick="window.app.handleDeleteFile('${f.file_id}', event)" title="Delete File" style="background:transparent; border:none; cursor:pointer; color:var(--clay-rose); font-size:1.1rem; padding:4px; opacity:0; transition:opacity 0.2s;">
+              <i class="ph-fill ph-trash"></i>
+            </button>
           </div>
       `).join('');
   }
 
   sidebar.innerHTML = `
     <div class="sidebar-logo">
-      <span class="logo-icon">🧠</span>
+      <span class="logo-icon"><i class="ph-fill ph-brain"></i></span>
       <div>
         <div class="logo-text">DataChat</div>
         <div class="logo-sub">AI Data Platform</div>

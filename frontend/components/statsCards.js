@@ -37,14 +37,14 @@ export function renderStatsCards(stats, container) {
 function buildKPIs(stats) {
   const kpis = [
     {
-      icon: '📋',
+      icon: '<i class="ph ph-table"></i>',
       label: 'Total Rows',
       value: stats.row_count?.toLocaleString() ?? '—',
       sub: `${stats.column_count} columns`,
       color: 'sky',
     },
     {
-      icon: '📐',
+      icon: '<i class="ph ph-columns"></i>',
       label: 'Columns',
       value: stats.column_count ?? '—',
       sub: stats.table_name ?? '',
@@ -57,7 +57,7 @@ function buildKPIs(stats) {
   const colors = ['peach', 'yellow', 'rose', 'lavender'];
   numeric.forEach(([col, s], i) => {
     kpis.push({
-      icon: '📈',
+      icon: '<i class="ph ph-trend-up"></i>',
       label: col.replace(/_/g, ' '),
       value: s.avg != null ? formatNum(s.avg) : '—',
       sub: `min ${formatNum(s.min)} · max ${formatNum(s.max)}`,
@@ -71,7 +71,7 @@ function buildKPIs(stats) {
     const [col, values] = cats[0];
     const top = values[0];
     kpis.push({
-      icon: '🏷️',
+      icon: '<i class="ph ph-tag"></i>',
       label: `Top ${col.replace(/_/g, ' ')}`,
       value: top?.value ?? '—',
       sub: `${top?.count?.toLocaleString()} records`,
@@ -118,7 +118,7 @@ export async function renderCategoricalCharts(stats, containerElement) {
       const countData = await api.getValueCounts(fileId, col);
 
       const ctx = document.getElementById(`chart-${col}`);
-      const palette = ['#c4a1ff', '#a1d4ff', '#ffc4a1', '#a1ffcf', '#ffa1c4'];
+      const palette = ['#ffb3ba', '#ff8b94', '#ff6f69', '#ff9a9e', '#fecfef'];
 
       new Chart(ctx, {
         type: 'doughnut',

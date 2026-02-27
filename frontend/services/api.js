@@ -43,9 +43,13 @@ export const api = {
     /** Aggregate stats for a file */
     getStats: (file_id) => get(`/stats?file_id=${file_id}`),
 
-    // ── NL Query (scoped to file_id) ─────────────────────────────────────────
+    // ── NL Query & Sessions (scoped to file_id) ──────────────────────────────
     /** NL question → SQL → results + explanation + chart_type */
     query: (question, file_id, session_id) => post('/query', { question, file_id, session_id }),
+    /** Fetch historic chat sessions */
+    getSessions: (file_id) => get(`/sessions?file_id=${file_id}`),
+    /** Delete a chat session */
+    deleteSession: (session_id) => fetch(`${BASE_URL}/sessions/${session_id}`, { method: 'DELETE' }).then(r => r.json()),
 
     // ── JSON Data Layer ───────────────────────────────────────────────────────
     getData: (file_id, limit = 5000) => get(`/data?file_id=${file_id}&limit=${limit}`),

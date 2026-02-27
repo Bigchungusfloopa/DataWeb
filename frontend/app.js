@@ -71,7 +71,48 @@ async function selectFile(file_id) {
     if (chatPanel) chatPanel.setFileId(file_id);
 
     const activeFile = state.files.find(f => f.file_id === file_id);
-    showToast(`📂 Switched to "${activeFile?.filename || file_id}"`, 'info');
+    showToast(`Switched to "${activeFile?.filename || file_id}"`, 'info');
+}
+
+// ── Delete File ───────────────────────────────────────────────────────────────
+async function handleDeleteFile(file_id, event) {
+    if (event) event.stopPropagation();
+
+    // Optimistic UI update
+    const fileIndex = state.files.findIndex(f => f.file_id === file_id);
+    const filename = fileIndex > -1 ? state.files[fileIndex].filename : 'File';
+
+    try {
+        await api.deleteFile(file_id);
+        showToast(`Deleted "${filename}"`, 'info');
+
+        // Remove from list
+        state.files = state.files.filter(f => f.file_id !== file_id);
+
+        if (state.activeFileId === file_id) {
+            state.activeFileId = null;
+            state.schema = null;
+            state.stats = null;
+            state.tableRows = [];
+            state.tableColumns = [];
+            if (chatPanel) chatPanel.setFileId(null);
+
+            // Re-select if another file exists
+            if (state.files.length > 0) {
+                await selectFile(state.files[0].file_id);
+            } else {
+                navigateTo('upload');
+            }
+        }
+
+        renderSidebar(state.currentView, navigateTo, state.health, state.files, state.activeFileId, selectFile);
+
+        // Refresh active view
+        if (state.currentView === 'dashboard') loadDashboard();
+        if (state.currentView === 'explorer') loadExplorer();
+    } catch (err) {
+        showToast(`Failed to delete file: ${err.message}`, 'error');
+    }
 }
 
 // ── Navigation ───────────────────────────────────────────────────────────────
@@ -93,10 +134,10 @@ async function loadDashboard() {
     if (!state.activeFileId || !state.schema) {
         if (statsContainer) statsContainer.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">📊</div>
+        <div class="empty-icon"><i class="ph ph-chart-bar"></i></div>
         <div class="empty-title">No file selected</div>
         <div class="empty-sub">Upload a CSV or select one from the sidebar.</div>
-        <button class="clay-btn primary" onclick="window.app.navigateTo('upload')" style="margin-top:12px;">Upload CSV →</button>
+        <button class="clay-btn primary" onclick="window.app.navigateTo('upload')" style="margin-top:12px;">Upload CSV &rarr;</button>
       </div>`;
         return;
     }
@@ -131,7 +172,7 @@ async function onUploadSuccess(schema, parsedCSV, file_id) {
         state.tableColumns = parsedCSV.columns;
         state.tableRows = parsedCSV.rows;
     }
-    showToast(`✅ Loaded "${schema.filename}" — ${schema.row_count?.toLocaleString()} rows`, 'success');
+    showToast(`Loaded "${schema.filename}" — ${schema.row_count?.toLocaleString()} rows`, 'success');
     setTimeout(() => navigateTo('dashboard'), 1200);
 }
 
@@ -157,6 +198,6 @@ function showToast(msg, type = 'info', duration = 3000) {
 }
 
 // ── Expose for HTML onclick handlers ─────────────────────────────────────────
-window.app = { navigateTo, showToast, selectFile };
+window.app = { navigateTo, showToast, selectFile, handleDeleteFile };
 
 document.addEventListener('DOMContentLoaded', init);

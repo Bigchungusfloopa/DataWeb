@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DataChat — Conversational Data Intelligence Platform</title>
-  <meta name="description" content="Upload any CSV and ask questions in natural language. Powered by Llama 3.1 and DuckDB." />
+  <meta name="description"
+    content="Upload any CSV and ask questions in natural language. Powered by Llama 3.1 and DuckDB." />
 
   <!-- Styles -->
   <link rel="stylesheet" href="styles/clay.css" />
@@ -12,7 +14,11 @@
 
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
+
 <body>
 
   <div class="app-layout">
@@ -64,26 +70,31 @@
         <!-- How it works -->
         <div class="mt-6">
           <div class="view-subtitle" style="margin-bottom: 12px;">How it works</div>
-          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px;" class="stagger-in">
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px;"
+            class="stagger-in">
             <div class="clay-card sky" style="padding: 18px;">
-              <div style="font-size:1.6rem; margin-bottom:8px;">1️⃣</div>
+              <div style="font-size:1.6rem; margin-bottom:8px;"><i class="ph ph-upload-simple"></i></div>
               <div style="font-weight:800; color:var(--text-dark); margin-bottom:4px;">Upload CSV</div>
-              <div style="font-size:0.8rem; color:var(--text-mid); font-weight:600;">Drag your CSV — it's loaded into DuckDB instantly.</div>
+              <div style="font-size:0.8rem; color:var(--text-mid); font-weight:600;">Drag your CSV — it's loaded into
+                DuckDB instantly.</div>
             </div>
             <div class="clay-card mint" style="padding: 18px;">
-              <div style="font-size:1.6rem; margin-bottom:8px;">2️⃣</div>
+              <div style="font-size:1.6rem; margin-bottom:8px;"><i class="ph ph-chat-text"></i></div>
               <div style="font-weight:800; color:var(--text-dark); margin-bottom:4px;">Ask in English</div>
-              <div style="font-size:0.8rem; color:var(--text-mid); font-weight:600;">Type any question — Llama 3.1 generates the SQL.</div>
+              <div style="font-size:0.8rem; color:var(--text-mid); font-weight:600;">Type any question — Llama 3.1
+                generates the SQL.</div>
             </div>
             <div class="clay-card peach" style="padding: 18px;">
-              <div style="font-size:1.6rem; margin-bottom:8px;">3️⃣</div>
+              <div style="font-size:1.6rem; margin-bottom:8px;"><i class="ph ph-chart-bar"></i></div>
               <div style="font-weight:800; color:var(--text-dark); margin-bottom:4px;">See Results</div>
-              <div style="font-size:0.8rem; color:var(--text-mid); font-weight:600;">DuckDB runs the query, AI explains in plain English + chart.</div>
+              <div style="font-size:0.8rem; color:var(--text-mid); font-weight:600;">DuckDB runs the query, AI explains
+                in plain English + chart.</div>
             </div>
             <div class="clay-card yellow" style="padding: 18px;">
-              <div style="font-size:1.6rem; margin-bottom:8px;">4️⃣</div>
+              <div style="font-size:1.6rem; margin-bottom:8px;"><i class="ph ph-file-sql"></i></div>
               <div style="font-weight:800; color:var(--text-dark); margin-bottom:4px;">Verify SQL</div>
-              <div style="font-size:0.8rem; color:var(--text-mid); font-weight:600;">Every answer shows the SQL — fully explainable, no hallucinations.</div>
+              <div style="font-size:0.8rem; color:var(--text-mid); font-weight:600;">Every answer shows the SQL — fully
+                explainable, no hallucinations.</div>
             </div>
           </div>
         </div>
@@ -98,4 +109,5 @@
   <!-- App entry point (ES modules) -->
   <script type="module" src="app.js"></script>
 </body>
+
 </html>

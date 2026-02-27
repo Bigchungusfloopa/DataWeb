@@ -16,7 +16,7 @@ export class UploadPanel {
     if (!this.container) return;
     this.container.innerHTML = `
       <div class="upload-zone" id="drop-zone">
-        <div class="upload-icon">📂</div>
+        <div class="upload-icon"><i class="ph ph-upload-simple"></i></div>
         <div class="upload-title">Drop your CSV file here</div>
         <div class="upload-sub">or click to browse — any structured CSV works</div>
         <input type="file" id="file-input" accept=".csv" style="display:none;">
@@ -45,17 +45,17 @@ export class UploadPanel {
   async handleFile(file) {
     if (this.uploading) return;
     if (!file.name.endsWith('.csv')) {
-      this.setStatus('❌ Only CSV files are supported.', 'error');
+      this.setStatus('<i class="ph-fill ph-x-circle" style="vertical-align:-2px;"></i> Only CSV files are supported.', 'error');
       return;
     }
 
-    this.setStatus('⏳ Reading file…', 'info');
+    this.setStatus('<i class="ph ph-spinner ph-spin" style="vertical-align:-2px;"></i> Reading file…', 'info');
     try {
       const parsed = await readCSVFile(file);
       this.showSchemaPreview(parsed, file);
       await this.uploadToBackend(file, parsed);
     } catch (err) {
-      this.setStatus(`❌ ${err.message}`, 'error');
+      this.setStatus(`<i class="ph-fill ph-x-circle" style="vertical-align:-2px;"></i> ${err.message}`, 'error');
     }
   }
 
@@ -69,7 +69,7 @@ export class UploadPanel {
       <div class="clay-card" style="padding: 20px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
           <div>
-            <div style="font-size:0.85rem; font-weight:800; color:var(--text-dark);">📄 ${file.name}</div>
+            <div style="font-size:0.85rem; font-weight:800; color:var(--text-dark);"><i class="ph-fill ph-file-csv" style="vertical-align:-2px;"></i> ${file.name}</div>
             <div style="font-size:0.75rem; color:var(--text-mid); font-weight:600;">
               ${parsed.rowCount.toLocaleString()} rows · ${parsed.columns.length} columns
             </div>
@@ -80,7 +80,7 @@ export class UploadPanel {
       const vals = parsed.rows.map(r => r[col]);
       const type = detectColumnType(vals);
       const colorMap = { numeric: 'sky', categorical: 'mint', text: 'peach' };
-      const typeIcon = { numeric: '🔢', categorical: '🏷️', text: '📝' };
+      const typeIcon = { numeric: '<i class="ph ph-hash"></i>', categorical: '<i class="ph ph-tag"></i>', text: '<i class="ph ph-text-t"></i>' };
       return `
               <span class="col-chip" style="background:var(--clay-${colorMap[type]}); box-shadow:2px 2px 0 var(--shadow-${colorMap[type]});">
                 ${typeIcon[type]} ${col}
@@ -92,14 +92,14 @@ export class UploadPanel {
 
   async uploadToBackend(file, parsed) {
     this.uploading = true;
-    this.setStatus('⬆️ Uploading to backend…', 'info');
+    this.setStatus('<i class="ph ph-upload-simple" style="vertical-align:-2px;"></i> Uploading to backend…', 'info');
 
     try {
       const result = await api.upload(file);
-      this.setStatus(`✅ ${result.message}`, 'success');
+      this.setStatus(`<i class="ph-fill ph-check-circle" style="vertical-align:-2px;"></i> ${result.message}`, 'success');
       if (this.onUploadSuccess) this.onUploadSuccess(result.schema, parsed, result.file_id);
     } catch (err) {
-      this.setStatus(`❌ Backend error: ${err.message}. Make sure the backend is running on localhost:8000.`, 'error');
+      this.setStatus(`<i class="ph-fill ph-x-circle" style="vertical-align:-2px;"></i> Backend error: ${err.message}. Make sure the backend is running on localhost:8000.`, 'error');
     } finally {
       this.uploading = false;
     }
