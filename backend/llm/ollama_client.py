@@ -1,6 +1,5 @@
 """
 Ollama HTTP client for Llama 3.1 8B.
-Calls the local Ollama server at http://localhost:11434.
 """
 import httpx
 import re
@@ -10,15 +9,14 @@ MODEL = "llama3.1:8b"
 TIMEOUT = httpx.Timeout(120.0)
 
 
-async def _call_ollama(prompt: str, temperature: float = 0.0) -> str:
+async def _call_ollama(prompt: str, temperature: float = 0.0, max_tokens: int = 512) -> str:
     payload = {
         "model": MODEL,
         "prompt": prompt,
         "stream": False,
         "options": {
             "temperature": temperature,
-            "num_predict": 512,
-            "stop": ["\n\n\n"],   # don't stop on single newlines (SQL can be multiline)
+            "num_predict": max_tokens,
         },
     }
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
@@ -27,15 +25,32 @@ async def _call_ollama(prompt: str, temperature: float = 0.0) -> str:
         return response.json().get("response", "").strip()
 
 
+async def classify_question(prompt: str) -> str:
+    """
+    Returns one of: 'SQL', 'COMPUTE', 'GENERAL'
+    Uses very low token count since we only need one word back.
+    """
+    raw = await _call_ollama(prompt, temperature=0.0, max_tokens=5)
+    # Extract the classification word robustly
+    upper = raw.strip().upper()
+    for label in ("COMPUTE", "GENERAL", "SQL"):
+        if label in upper:
+            return label
+    return "SQL"  # default to SQL if uncertain
+
+
 async def generate_sql(prompt: str) -> str:
-    """Generate SQL and return a clean, executable SQL string."""
     raw = await _call_ollama(prompt, temperature=0.0)
     return _clean_sql(raw)
 
 
 async def explain_results(prompt: str) -> str:
-    """Generate a friendly natural language explanation."""
     return await _call_ollama(prompt, temperature=0.3)
+
+
+async def answer_general(prompt: str) -> str:
+    """Answer a question directly without SQL (definitions, conversions, advice)."""
+    return await _call_ollama(prompt, temperature=0.1, max_tokens=400)
 
 
 async def check_ollama_health() -> bool:
@@ -48,49 +63,41 @@ async def check_ollama_health() -> bool:
 
 
 def _clean_sql(raw: str) -> str:
-    """
-    Aggressively clean LLM output to extract just the SQL statement.
-    Handles: markdown fences, leading explanation text, trailing notes.
-    """
+    """Aggressively extract just the SQL from LLM output."""
     if not raw:
         return ""
 
-    # 1. Extract from ```sql ... ``` code fence if present
-    fence_match = re.search(r"```(?:sql)?\s*(.*?)```", raw, re.IGNORECASE | re.DOTALL)
-    if fence_match:
-        raw = fence_match.group(1).strip()
+    # Strip markdown code fences
+    fence = re.search(r"```(?:sql)?\s*(.*?)```", raw, re.IGNORECASE | re.DOTALL)
+    if fence:
+        raw = fence.group(1).strip()
 
-    # 2. Strip inline backticks
     raw = raw.replace("`", "").strip()
 
-    # 3. Find the first SELECT/WITH/INSERT keyword — discard everything before it
+    # Find first SQL keyword
     match = re.search(r"\b(SELECT|WITH|INSERT|UPDATE|DELETE)\b", raw, re.IGNORECASE)
     if match:
         raw = raw[match.start():]
 
-    # 4. If there are multiple statements, take only the first
-    # Split on semicolon then take the first non-empty part
+    # Take only first statement
     parts = [p.strip() for p in raw.split(";") if p.strip()]
     if parts:
         raw = parts[0]
 
-    # 5. Remove trailing lines that look like explanations (don't start with SQL keywords)
+    # Remove trailing prose lines
+    sql_keywords = {
+        "SELECT", "FROM", "WHERE", "GROUP", "ORDER", "HAVING", "LIMIT",
+        "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AND", "OR",
+        "CASE", "WHEN", "THEN", "ELSE", "END", "AS", "BY", "WITH",
+        "UNION", "CAST", "COUNT", "SUM", "AVG", "MIN", "MAX",
+        "DISTINCT", "NOT", "NULL", "IS", "IN", "ROUND",
+    }
     sql_lines = []
     for line in raw.splitlines():
         stripped = line.strip()
-        # Stop collecting if line looks like commentary (starts with -- is ok, that's a SQL comment)
-        if stripped and not stripped.startswith("--"):
-            # Check if it looks like prose (starts with a capital letter followed by space, not a SQL keyword)
-            sql_keywords = {"SELECT", "FROM", "WHERE", "GROUP", "ORDER", "HAVING", "LIMIT",
-                            "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AND", "OR",
-                            "CASE", "WHEN", "THEN", "ELSE", "END", "AS", "BY", "WITH",
-                            "UNION", "INTERSECT", "EXCEPT", "CAST", "COUNT", "SUM",
-                            "AVG", "MIN", "MAX", "DISTINCT", "NOT", "NULL", "IS", "IN"}
-            first_word = stripped.split()[0].upper() if stripped.split() else ""
-            if sql_lines and first_word not in sql_keywords and re.match(r'^[A-Z][a-z]', stripped):
-                break  # Looks like an explanation sentence — stop here
+        first_word = stripped.split()[0].upper() if stripped.split() else ""
+        if sql_lines and first_word not in sql_keywords and re.match(r'^[A-Z][a-z]', stripped):
+            break
         sql_lines.append(line)
 
-    raw = "\n".join(sql_lines).strip()
-
-    return raw
+    return "\n".join(sql_lines).strip()

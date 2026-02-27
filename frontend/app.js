@@ -1,5 +1,6 @@
 /**
  * App.js — Main application router and state manager
+ * Now supports multiple files: each upload gets a file_id, state.activeFileId tracks the active one.
  */
 import { renderSidebar } from './components/sidebar.js';
 import { renderStatsCards, renderCategoricalCharts } from './components/statsCards.js';
@@ -11,7 +12,9 @@ import api from './services/api.js';
 // ── App State ────────────────────────────────────────────────────────────────
 const state = {
     currentView: 'upload',
-    schema: null,
+    activeFileId: null,      // UUID of the currently selected file
+    files: [],        // all uploaded files from /files
+    schema: null,      // schema of the active file
     stats: null,
     health: null,
     tableRows: [],
@@ -26,26 +29,58 @@ let uploadPanel = null;
 // ── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
     navigateTo('upload');
-
     dataTable = new DataTable('explorer-table');
     chatPanel = new ChatPanel('chat-view-content');
     uploadPanel = new UploadPanel('upload-view-content', onUploadSuccess);
 
-    // Poll health status every 5s
     await refreshHealth();
-    setInterval(refreshHealth, 5000);
+    await loadFileList();   // load any previously uploaded files
+    setInterval(refreshHealth, 8000);
+}
+
+// ── File list ─────────────────────────────────────────────────────────────────
+async function loadFileList() {
+    try {
+        state.files = await api.listFiles();
+        // Auto-select the most recently uploaded file if none active
+        if (!state.activeFileId && state.files.length > 0) {
+            await selectFile(state.files[0].file_id);
+        }
+    } catch { /* server may not have any files yet */ }
+    renderSidebar(state.currentView, navigateTo, state.health, state.files, state.activeFileId, selectFile);
+}
+
+// ── Select active file ────────────────────────────────────────────────────────
+async function selectFile(file_id) {
+    if (state.activeFileId === file_id) return;
+    state.activeFileId = file_id;
+    state.schema = null;
+    state.stats = null;
+    state.tableRows = [];
+    state.tableColumns = [];
+
+    try {
+        state.schema = await api.getSchema(file_id);
+    } catch { /* file may not be loaded in memory yet */ }
+
+    renderSidebar(state.currentView, navigateTo, state.health, state.files, state.activeFileId, selectFile);
+
+    // Refresh active view
+    if (state.currentView === 'dashboard') loadDashboard();
+    if (state.currentView === 'explorer') loadExplorer();
+    if (chatPanel) chatPanel.setFileId(file_id);
+
+    const activeFile = state.files.find(f => f.file_id === file_id);
+    showToast(`📂 Switched to "${activeFile?.filename || file_id}"`, 'info');
 }
 
 // ── Navigation ───────────────────────────────────────────────────────────────
 function navigateTo(viewId) {
     state.currentView = viewId;
-
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     const target = document.getElementById(`view-${viewId}`);
     if (target) target.classList.add('active');
-
-    renderSidebar(viewId, navigateTo, state.health);
-
+    renderSidebar(state.currentView, navigateTo, state.health, state.files, state.activeFileId, selectFile);
     if (viewId === 'dashboard') loadDashboard();
     if (viewId === 'explorer') loadExplorer();
 }
@@ -55,20 +90,20 @@ async function loadDashboard() {
     const statsContainer = document.getElementById('stats-container');
     const chartContainer = document.getElementById('chart-container');
 
-    if (!state.schema) {
+    if (!state.activeFileId || !state.schema) {
         if (statsContainer) statsContainer.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">📊</div>
-        <div class="empty-title">No dataset loaded</div>
-        <div class="empty-sub">Upload a CSV file to see your data insights here.</div>
+        <div class="empty-title">No file selected</div>
+        <div class="empty-sub">Upload a CSV or select one from the sidebar.</div>
         <button class="clay-btn primary" onclick="window.app.navigateTo('upload')" style="margin-top:12px;">Upload CSV →</button>
       </div>`;
         return;
     }
 
-    renderStatsCards(null, statsContainer); // show skeleton
+    renderStatsCards(null, statsContainer);
     try {
-        if (!state.stats) state.stats = await api.getStats();
+        if (!state.stats) state.stats = await api.getStats(state.activeFileId);
         renderStatsCards(state.stats, statsContainer);
         renderCategoricalCharts(state.stats, chartContainer);
     } catch (err) {
@@ -79,27 +114,24 @@ async function loadDashboard() {
 // ── Explorer ──────────────────────────────────────────────────────────────────
 async function loadExplorer() {
     if (state.tableRows.length === 0 && state.schema) {
-        // Load sample from schema
         state.tableRows = state.schema.sample || [];
         state.tableColumns = state.schema.columns?.map(c => c.name) || [];
     }
     dataTable.setData(state.tableColumns, state.tableRows);
 }
 
-// ── Upload success callback ───────────────────────────────────────────────────
-async function onUploadSuccess(schema, parsedCSV) {
+// ── Upload success ────────────────────────────────────────────────────────────
+async function onUploadSuccess(schema, parsedCSV, file_id) {
+    // Reload file list and activate the new file
+    state.files = await api.listFiles();
+    await selectFile(file_id);
     state.schema = schema;
-    state.stats = null; // reset stats cache
 
-    // Load table data from client-side parsed CSV for instant display
     if (parsedCSV) {
         state.tableColumns = parsedCSV.columns;
         state.tableRows = parsedCSV.rows;
     }
-
-    showToast(`✅ Loaded ${schema.row_count?.toLocaleString()} rows!`, 'success');
-
-    // Navigate to dashboard after short delay
+    showToast(`✅ Loaded "${schema.filename}" — ${schema.row_count?.toLocaleString()} rows`, 'success');
     setTimeout(() => navigateTo('dashboard'), 1200);
 }
 
@@ -107,13 +139,10 @@ async function onUploadSuccess(schema, parsedCSV) {
 async function refreshHealth() {
     try {
         state.health = await api.health();
-        if (state.health.dataset_loaded && !state.schema) {
-            state.schema = { table_name: state.health.table, row_count: state.health.rows };
-        }
     } catch {
-        state.health = { ollama: 'offline', dataset_loaded: false };
+        state.health = { ollama: 'offline', duckdb: { files_loaded: 0 } };
     }
-    renderSidebar(state.currentView, navigateTo, state.health);
+    renderSidebar(state.currentView, navigateTo, state.health, state.files, state.activeFileId, selectFile);
 }
 
 // ── Toast notifications ───────────────────────────────────────────────────────
@@ -128,7 +157,6 @@ function showToast(msg, type = 'info', duration = 3000) {
 }
 
 // ── Expose for HTML onclick handlers ─────────────────────────────────────────
-window.app = { navigateTo, showToast };
+window.app = { navigateTo, showToast, selectFile };
 
-// ── Start ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', init);

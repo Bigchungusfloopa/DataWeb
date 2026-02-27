@@ -1,8 +1,9 @@
 """
-POST /upload  — accept a CSV file, register it in DuckDB
-GET  /schema  — return column names, types, row count, sample rows
+POST /upload  — accept a CSV, assign a file_id, register in DuckDB
+GET  /schema  — kept for backwards compat (requires ?file_id=)
 """
 import io
+import uuid
 import pandas as pd
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
@@ -22,21 +23,25 @@ async def upload_csv(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Could not parse CSV: {e}")
 
-    # Sanitize column names (no spaces, lowercase)
-    df.columns = [c.strip().replace(" ", "_").lower() for c in df.columns]
+    # Generate a stable unique id for this file
+    file_id = str(uuid.uuid4())
+    original_name = file.filename
 
-    table_name = "uploaded"
-    schema = duck.register_dataframe(df, table_name)
+    schema = duck.register_dataframe(df, file_id, original_name)
 
     return JSONResponse(content={
-        "message": f"Loaded {schema['row_count']} rows into table '{table_name}'.",
+        "file_id": file_id,
+        "message": f"Loaded {schema['row_count']} rows from '{original_name}'.",
         "schema": schema,
     })
 
 
 @router.get("/schema")
-async def get_schema():
-    schema = duck.get_schema()
+async def get_schema(file_id: str):
+    schema = duck.get_schema(file_id)
     if schema is None:
-        raise HTTPException(status_code=404, detail="No dataset loaded. Please upload a CSV first.")
+        raise HTTPException(
+            status_code=404,
+            detail=f"No dataset for file_id '{file_id}'. Upload a CSV first."
+        )
     return schema
